@@ -1,6 +1,24 @@
-
+import re
 import argparse
+import os
+import datetime
 
+def make_clusters(files_vec):
+    return map(to_date, 
+        filter(is_screenshot, files_vec)
+       )
+
+def is_screenshot(x):
+    return True if re.match('\d{4}-\d{2}-\d{2} \d{2}.\d{2}.\d{2}.png', x) else False
+    
+def to_date(x):
+    return datetime.datetime.strptime(x, '%Y-%m-%d %H.%M.%S.png')
+
+
+def random_points_create():
+    w
+    random.randint
+    
 def bake_options():
     return [
             [['--verbose', '-v'],
