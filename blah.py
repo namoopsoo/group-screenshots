@@ -8,10 +8,16 @@ from sklearn.preprocessing import StandardScaler
 import random
 
 def make_clusters(files_vec):
-    return map(to_date, 
-        filter(is_screenshot, files_vec)
-       )
+    screenshots = sorted(filter(is_screenshot, files_vec))
+    dates = map(to_date, screenshots)
+    
+    first_date = dates[0]
+    deltas = [(d - first_date).total_seconds() for d in dates]
+    
+    db = DBSCAN(eps=600, min_samples=10).fit([[x] for x in deltas])
+    return zip(screenshots, deltas, db.labels_)
 
+   
 def is_screenshot(x):
     return True if re.match('\d{4}-\d{2}-\d{2} \d{2}.\d{2}.\d{2}.png', x) else False
     
