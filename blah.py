@@ -1,7 +1,9 @@
 import re
+import ipdb
 import argparse
 import os
 import datetime
+import pandas as pd
 
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
@@ -11,7 +13,7 @@ DESTINATION_PARENT_DIR = os.getenv('DESTINATION_PARENT_DIR')
 
 def make_clusters(files_vec):
     screenshots = sorted(filter(is_screenshot, files_vec))
-    dates = map(to_date, screenshots)
+    dates = [to_date(x) for x in screenshots]
     
     first_date = dates[0]
     deltas = [(d - first_date).total_seconds() for d in dates]
@@ -20,14 +22,26 @@ def make_clusters(files_vec):
     out = zip(screenshots, deltas, db.labels_)
     return pd.DataFrame.from_records(out, columns=['file', 'delta', 'label'])
 
-def more_do():
+def more_do(search_directory, dry_run=True):
     
-    df = make_clusters(os.listdir('.'))
+    df = make_clusters(os.listdir(search_directory))
 
-    firsts_vec = list(df[df.label != -1].drop_duplicates(subset='label')[['label', 'file']].to_records(index=False))
+    firsts_vec = list(
+            df[df.label != -1].drop_duplicates(
+                subset='label')[['label', 'file']
+                    ].to_records(index=False))
     firsts_filenames = [x[1] for x in firsts_vec]
     new_dirs = [new_dir_name_from_filename(x) for x in firsts_filenames]
-    [create_new_group_dir(x) for x in new_dirs]
+
+    print('labels: '
+            + str(list(df.label.value_counts())[:10]))
+
+    print('Will create new dirs'
+            + str(new_dirs))
+    if not dry_run:
+        [create_new_group_dir(x) for x in new_dirs]
+
+    print('Done.')
     
     
    
@@ -84,7 +98,7 @@ def bake_options():
                 {'action': 'store_true',
                     'help': 'Dry run. Just print the command.  '},],
                     [['--search-directory', '-d'], {
-                    'action': 'store_true',
+                    'type': str,
                     'help': 'Where to look for clusters',
                     'required': True
                     }]
@@ -98,16 +112,7 @@ def bake_options():
     #             type='',
             
 
-def do():
-    parser = argparse.ArgumentParser()
 
-    [parser.add_argument(*x[0], **x[1])
-            for x in bake_options()]
-
-    # Collect args from user.
-    args = parser.parse_args()
-
-    print vars(args)
     
     
 import numpy as np
@@ -133,6 +138,22 @@ def doplot(x, y, labels):
     output_file(filename, title="color_scatter.py example")
 
     show(p)  # open a browser
+
+
+
+def do():
+    parser = argparse.ArgumentParser()
+
+    [parser.add_argument(*x[0], **x[1])
+            for x in bake_options()]
+
+    # Collect args from user.
+    args = vars(parser.parse_args())
+
+    print(args)
+
+    with ipdb.launch_ipdb_on_exception():
+        more_do(search_directory=args['search_directory'])
     
 do()
 
