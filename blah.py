@@ -7,6 +7,8 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 import random
 
+DESTINATION_PARENT_DIR = os.getenv('DESTINATION_PARENT_DIR')
+
 def make_clusters(files_vec):
     screenshots = sorted(filter(is_screenshot, files_vec))
     dates = map(to_date, screenshots)
@@ -15,8 +17,19 @@ def make_clusters(files_vec):
     deltas = [(d - first_date).total_seconds() for d in dates]
     
     db = DBSCAN(eps=600, min_samples=10).fit([[x] for x in deltas])
-    return zip(screenshots, deltas, db.labels_)
+    out = zip(screenshots, deltas, db.labels_)
+    return pd.DataFrame.from_records(out, columns=['file', 'delta', 'label'])
 
+def more_do():
+    
+    df = make_clusters(os.listdir('.'))
+
+    firsts_vec = list(df[df.label != -1].drop_duplicates(subset='label')[['label', 'file']].to_records(index=False))
+    firsts_filenames = [x[1] for x in firsts_vec]
+    new_dirs = [new_dir_name_from_filename(x) for x in firsts_filenames]
+    [create_new_group_dir(x) for x in new_dirs]
+    
+    
    
 def is_screenshot(x):
     return True if re.match('\d{4}-\d{2}-\d{2} \d{2}.\d{2}.\d{2}.png', x) else False
@@ -24,6 +37,19 @@ def is_screenshot(x):
 def to_date(x):
     return datetime.datetime.strptime(x, '%Y-%m-%d %H.%M.%S.png')
 
+def new_dir_name_from_filename(x):
+    assert is_screenshot(x)
+    d = to_date(x)
+    return os.path.join(DESTINATION_PARENT_DIR,
+                        '{}-{}'.format(
+                            d.strftime('%Y-%m-%d-%H%M'),
+                            random.randint(10,99)))
+
+def create_new_group_dir(dirname):
+    os.mkdir(dirname)
+    
+def plot_distances_between_clusters(clusters_df):
+    pass
 
 def random_points_create():
     # This quick experiment shows that the input to DBSCAN doesnt actually need to be StandardScaled . 
