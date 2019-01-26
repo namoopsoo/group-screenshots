@@ -2,12 +2,16 @@ import re
 import ipdb
 import argparse
 import os
+import random
 import datetime
 import pandas as pd
+import numpy as np
+import pprint
 
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-import random
+
+from bokeh.plotting import figure, show, output_file
 
 DESTINATION_PARENT_DIR = os.getenv('DESTINATION_PARENT_DIR')
 
@@ -41,9 +45,19 @@ def more_do(search_directory, dry_run=True):
     if not dry_run:
         [create_new_group_dir(x) for x in new_dirs]
 
+    # per row deltas..
+    df['delta_shifted'] = df['delta'].shift(1)
+    df['relative_delta_mins'] = (df['delta'] - df['delta_shifted'])/60
+
+
+    ### print all..
+    print('df is ' + str(df.shape[0]) + ' records.')
+    pprint.pprint(df.to_records())
+
     print('Done.')
     
-    
+    return df
+
    
 def is_screenshot(x):
     return True if re.match('\d{4}-\d{2}-\d{2} \d{2}.\d{2}.\d{2}.png', x) else False
@@ -97,11 +111,20 @@ def bake_options():
             [['--dry-run', '-D'],
                 {'action': 'store_true',
                     'help': 'Dry run. Just print the command.  '},],
-                    [['--search-directory', '-d'], {
-                    'type': str,
-                    'help': 'Where to look for clusters',
-                    'required': True
-                    }]
+            [['--search-directory', '-d'], {
+                'type': str,
+                'help': 'Where to look for clusters',
+                'required': True
+                }],
+            [['--write-clusters-to-csv', '-w'], {
+                'type': str,
+                'help': 'File where to write the clusters and labels found.',
+                'required': False
+                }],
+
+            [['--show-delta-plot', '-s'],
+                {'action': 'store_true',
+                    'help': 'Open browser with a plot of the labeled deltas in minutes, with a different color for each label.'},],
                 ]
     ##
     #             help='',
@@ -112,20 +135,24 @@ def bake_options():
     #             type='',
             
 
-
+def random_palettes(n):
+    return {i:
+    [random.randint(0,255),
+    random.randint(0,255),
+    random.randint(0,255)]
+    for i in range(n) }
     
     
-import numpy as np
-
-from bokeh.plotting import figure, show, output_file
 def doplot(x, y, labels):
     # import ipdb; ipdb.set_trace()
     N = x.shape[0]
-    radii = np.array([10,]*N)
+    radii = np.array([100,]*N)
 
+    palettes = random_palettes(len(set(labels.tolist())))
     colors = [
-        "#%02x%02x%02x" % (int(50+2*label), 
-        int(30+2*label), 150) for label in labels]
+        "#%02x%02x%02x" % tuple(palettes[label])
+        for label in labels ]
+
        
     TOOLS="hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,lasso_select,"
     p = figure(tools=TOOLS)
@@ -152,8 +179,21 @@ def do():
 
     print(args)
 
-    with ipdb.launch_ipdb_on_exception():
-        more_do(search_directory=args['search_directory'])
-    
+    # with ipdb.launch_ipdb_on_exception():
+    dfall = more_do(search_directory=args['search_directory'])
+    df = dfall[dfall.label != -1]
+
+    if args.get('show_delta_plot'):
+        doplot(df.delta/60, np.array([1]*df.shape[0]), df.label)
+
+    outfile = args.get('write_clusters_to_csv')
+    if outfile:
+        outpath = os.path.join(DESTINATION_PARENT_DIR,
+                outfile) 
+        dfall.to_csv(outpath)
+        print('Wrote to ' + outpath)
+   
+    pass
+
 do()
 
