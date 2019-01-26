@@ -51,7 +51,6 @@ def more_do(search_directory, dry_run=True):
 
 
     ### print all..
-    print('df is ' + str(df.shape[0]) + ' records.')
     pprint.pprint(df.to_records())
 
     print('Done.')
@@ -184,7 +183,11 @@ def do():
     df = dfall[dfall.label != -1]
 
     if args.get('show_delta_plot'):
-        doplot(df.delta/60, np.array([1]*df.shape[0]), df.label)
+        doplot(df.delta/60,
+                [
+                    0.999999995 if lab == -1 else 1
+                    for lab in dfall.label.tolist()],
+                df.label)
 
     outfile = args.get('write_clusters_to_csv')
     if outfile:
@@ -192,6 +195,13 @@ def do():
                 outfile) 
         dfall.to_csv(outpath)
         print('Wrote to ' + outpath)
+
+    print('cluster stats: ')
+    print('df is ' + str(dfall.shape[0]) + ' records.')
+    print('num clusters: ' + str(dfall.label.unique().shape[0] - 1))
+    print(str(dfall.label.map(
+        lambda x: 'labeled' if x != -1 else 'unlabeled').value_counts()))
+    print('cluster sizes ' + str(sorted(dict(dfall.label.value_counts()).values())))
    
     pass
 
