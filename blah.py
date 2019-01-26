@@ -22,9 +22,10 @@ def make_clusters(files_vec):
     first_date = dates[0]
     deltas = [(d - first_date).total_seconds() for d in dates]
     
-    db = DBSCAN(eps=600, min_samples=10).fit([[x] for x in deltas])
+    db = DBSCAN(eps=600, min_samples=5).fit([[x] for x in deltas])
     out = zip(screenshots, deltas, db.labels_)
     return pd.DataFrame.from_records(out, columns=['file', 'delta', 'label'])
+
 
 def more_do(search_directory, dry_run=True):
     
@@ -36,14 +37,40 @@ def more_do(search_directory, dry_run=True):
                     ].to_records(index=False))
     firsts_filenames = [x[1] for x in firsts_vec]
     new_dirs = [new_dir_name_from_filename(x) for x in firsts_filenames]
+    cluster_dir_map = dict(zip(
+        [x[0] for x in firsts_vec],
+        new_dirs))
+
+    blahvec = list(df[df.label != -1][['file', 'label']].to_records(index=False))
+
+
+    move_instructions_relative = [[filename, cluster_dir_map[label]]
+            for (filename, label) in blahvec]
+    move_instructions = [
+            [
+                os.path.join(search_directory, row[0]),
+                os.path.join(row[1], row[0])]
+
+            for row in move_instructions_relative]
+
+    import ipdb ; ipdb.set_trace();
+
 
     print('labels: '
             + str(list(df.label.value_counts())[:10]))
 
-    print('Will create new dirs'
-            + str(new_dirs))
+    print('Will create {} new dirs'.format(len(new_dirs)))
+
+    print('First 20 move instructions ... ') 
+    [print([instruction[0], instruction[1]]) for instruction
+            in move_instructions[:20]]
+
     if not dry_run:
         [create_new_group_dir(x) for x in new_dirs]
+
+        [os.rename(instruction[0], instruction[1])
+                for instruction in move_instructions 
+                ]
 
     # per row deltas..
     df['delta_shifted'] = df['delta'].shift(1)
@@ -179,7 +206,8 @@ def do():
     print(args)
 
     # with ipdb.launch_ipdb_on_exception():
-    dfall = more_do(search_directory=args['search_directory'])
+    dfall = more_do(search_directory=args['search_directory'],
+            dry_run=args['dry_run'])
     df = dfall[dfall.label != -1]
 
     if args.get('show_delta_plot'):
